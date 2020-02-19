@@ -1,6 +1,7 @@
 package cloudwatch
 
 import (
+	"errors"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/cloudwatch"
@@ -44,6 +45,47 @@ func getInstance() string {
 	return string(body)
 }
 
+// Find takes a slice and looks for an element in it. If found it will
+// return it's key, otherwise it will return -1 and a bool of false.
+func find(slice []*float64, val *float64) (int, bool) {
+	for i, item := range slice {
+		if item == val {
+			return i, true
+		}
+	}
+	return -1, false
+}
+
+// mergeMetrics, merges two sets of metrics.
+func mergeMetrics(m1 *cloudwatch.MetricDatum, m2 *cloudwatch.MetricDatum) *cloudwatch.MetricDatum {
+
+	m1.Timestamp = m2.Timestamp
+	m1.Dimensions = m2.Dimensions
+	m1.MetricName = m2.MetricName
+	m1.StorageResolution = m2.StorageResolution
+	m1.Unit = m2.Unit
+
+	if m1.Values == nil {
+		m1.Values = make([]*float64, 0, int(*m2.StorageResolution))
+		m1.Values = nil
+	}
+	if m1.Counts == nil {
+		m1.Counts = make([]*float64, 0, int(*m2.StorageResolution))
+	}
+
+	k, found := find(m1.Values, m2.Value)
+	if found == false {
+		m1.Values = append(m1.Values, m2.Value)
+		count := 1.0
+		m1.Counts = append(m1.Counts, &count)
+	} else {
+		newCount := *m1.Counts[k] + 1.0
+		m1.Counts[k] = &newCount
+	}
+
+	return m1
+}
+
 // getMetrics gets metrics to be pushed to cloudwatch
 func getMetrics(instance *string, resolution int64) []*cloudwatch.MetricDatum {
 	time := time.Now()
@@ -53,7 +95,7 @@ func getMetrics(instance *string, resolution int64) []*cloudwatch.MetricDatum {
 		panic(err)
 	}
 
-	instanceDimension := "Intance"
+	instanceDimension := "Instance"
 	gpuDimension := "GPU"
 	gpuUtilizationMetricName := "GPUUtilization"
 	memoryUsedMetricName := "MemoryUsed"
@@ -110,6 +152,13 @@ func getMetrics(instance *string, resolution int64) []*cloudwatch.MetricDatum {
 func logMetrics(svc *cloudwatch.CloudWatch,
 	metrics []*cloudwatch.MetricDatum) {
 
+	for _, m := range metrics {
+		err := m.Validate()
+		if err != nil {
+			panic(err)
+		}
+	}
+
 	namespace := "nvidia-cloudwatch"
 	_, err := svc.PutMetricData(&cloudwatch.PutMetricDataInput{
 		MetricData: metrics,
@@ -121,6 +170,13 @@ func logMetrics(svc *cloudwatch.CloudWatch,
 	}
 }
 
+// logAllMetrics logs a list of list of metrics.
+func logAllMetrics(svc *cloudwatch.CloudWatch, metricsList [][]*cloudwatch.MetricDatum) {
+	for _, metrics := range metricsList {
+		logMetrics(svc, metrics)
+	}
+}
+
 // StartExporter starts the process of pushing metrics
 func StartExporter() {
 	region := os.Getenv("AWS_REGION")
@@ -129,7 +185,15 @@ func StartExporter() {
 		log.Panic(err)
 	}
 
+	// the period at which we collect and send metrics.
 	period := 60
+	p := os.Getenv("PERIOD")
+	if p != "" {
+		period, err = strconv.Atoi(p)
+		if err != nil {
+			log.Panic(err)
+		}
+	}
 
 	resolution := 60
 	r := os.Getenv("RESOLUTION")
@@ -140,19 +204,69 @@ func StartExporter() {
 		}
 	}
 
+	if !(resolution == 60 || resolution == 1) {
+		panic(errors.New("Resolution must be 1 or 60"))
+	}
+
+	if period < resolution {
+		panic(errors.New("Period must be greater than or equal to resolution."))
+	}
+
 	instanceName := getInstance()
 
-	cloudwatch := cloudwatch.New(sess)
+	svc := cloudwatch.New(sess)
 
 	nvidia.Init()
 	defer nvidia.Shutdown()
-	for {
-		nextTime := time.Now().Truncate(time.Second)
-		nextTime = nextTime.Add(time.Duration(period) * time.Second)
 
-		metrics := getMetrics(&instanceName, int64(resolution))
-		logMetrics(cloudwatch, metrics)
+	if resolution == 60 {
 
-		time.Sleep(time.Until(nextTime))
+		lastLogTime := time.Now().Truncate(time.Second)
+		metrics := make([]*cloudwatch.MetricDatum, 3, 3)
+		for i, _ := range metrics {
+			metrics[i] = &cloudwatch.MetricDatum{}
+		}
+
+		for {
+			nextTime := time.Now().Truncate(time.Second)
+			nextTime = nextTime.Add(time.Duration(resolution) * time.Second)
+
+			newMetrics := getMetrics(&instanceName, int64(resolution))
+
+			// merge them.  We assume that they are in the same order.
+			for i, _ := range metrics {
+				metrics[i] = mergeMetrics(metrics[i], newMetrics[i])
+			}
+
+			if int(time.Now().Truncate(time.Second).Sub(lastLogTime)/time.Second) >= period {
+				go logMetrics(svc, metrics)
+				lastLogTime = time.Now().Truncate(time.Second)
+				metrics = make([]*cloudwatch.MetricDatum, 3, 3)
+				for i, _ := range metrics {
+					metrics[i] = &cloudwatch.MetricDatum{}
+				}
+			}
+
+			time.Sleep(time.Until(nextTime))
+		}
+	} else {
+		// 1 second resolution
+		lastLogTime := time.Now().Truncate(time.Second)
+		metrics := make([][]*cloudwatch.MetricDatum, 0, 60)
+
+		for {
+
+			nextTime := time.Now().Truncate(time.Second)
+			nextTime = nextTime.Add(time.Duration(resolution) * time.Second)
+
+			metrics = append(metrics, getMetrics(&instanceName, int64(resolution)))
+			if int(time.Now().Truncate(time.Second).Sub(lastLogTime)/time.Second) >= period {
+				go logAllMetrics(svc, metrics)
+				lastLogTime = time.Now().Truncate(time.Second)
+				metrics = make([][]*cloudwatch.MetricDatum, 0, 60)
+			}
+
+			time.Sleep(time.Until(nextTime))
+		}
 	}
 }
