@@ -4,6 +4,8 @@ aws: {}
 # region: us-east-1
 # accessKeyId: xxxx
 # secretAccessKey: xxxx
+period: 60
+resolution: 60
 
 image:
   repository: calebpalmer/nvidia-cloudwatch

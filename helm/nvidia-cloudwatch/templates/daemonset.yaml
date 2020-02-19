@@ -28,7 +28,9 @@ spec:
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           env:
             - name: PERIOD
-              value: "60"
+              value: {{ .Values.period | quote }}
+            - name: RESOLUTION
+              value: {{ .Values.resolution | quote }}
             {{- if .Values.aws.region }}
             - name: AWS_REGION
               value: {{ .Values.aws.region }}
