@@ -101,7 +101,7 @@ func getMetrics(instance *string, resolution int64) []*cloudwatch.MetricDatum {
 	memoryUsedMetricName := "MemoryUsed"
 	memoryFreeMetricName := "MemoryFree"
 	percentUnit := cloudwatch.StandardUnitPercent
-	bytesUnit := cloudwatch.StandardUnitBytes
+	memoryUnit := cloudwatch.StandardUnitMegabytes
 
 	metrics := make([]*cloudwatch.MetricDatum, 0, 3)
 
@@ -128,18 +128,18 @@ func getMetrics(instance *string, resolution int64) []*cloudwatch.MetricDatum {
 			Dimensions:        dimensions,
 			MetricName:        &memoryUsedMetricName,
 			StorageResolution: &resolution,
-			Unit:              &bytesUnit,
+			Unit:              &memoryUnit,
 			Value:             &memoryUsed,
 		}
 		metrics = append(metrics, &memoryUsedMetric)
 
-		memoryFree := float64(*device.UsedMemory)
+		memoryFree := float64(*device.FreeMemory)
 		memoryFreeMetric := cloudwatch.MetricDatum{
 			Timestamp:         &time,
 			Dimensions:        dimensions,
 			MetricName:        &memoryFreeMetricName,
 			StorageResolution: &resolution,
-			Unit:              &bytesUnit,
+			Unit:              &memoryUnit,
 			Value:             &memoryFree,
 		}
 		metrics = append(metrics, &memoryFreeMetric)
