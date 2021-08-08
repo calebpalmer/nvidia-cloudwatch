@@ -2,16 +2,17 @@ package cloudwatch
 
 import (
 	"errors"
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/cloudwatch"
-	"github.com/calebpalmer/nvidia-cloudwatch/pkg/nvidia"
 	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
 	"strconv"
 	"time"
+
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/cloudwatch"
+	"github.com/calebpalmer/nvidia-cloudwatch/pkg/nvidia"
 )
 
 // createSession creates an AWS Session
@@ -215,9 +216,6 @@ func StartExporter() {
 	instanceName := getInstance()
 
 	svc := cloudwatch.New(sess)
-
-	nvidia.Init()
-	defer nvidia.Shutdown()
 
 	if resolution == 60 {
 
