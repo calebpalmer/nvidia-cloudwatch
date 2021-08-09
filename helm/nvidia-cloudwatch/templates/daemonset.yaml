@@ -12,6 +12,9 @@ spec:
     metadata:
       labels:
         {{- include "nvidia-cloudwatch.selectorLabels" . | nindent 8 }}
+      annotations:
+        prometheus.io/scrape: 'true'
+        prometheus.io/port: '2112'
     spec:
     {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
@@ -24,7 +27,7 @@ spec:
         - name: {{ .Chart.Name }}
           securityContext:
             {{- toYaml .Values.securityContext | nindent 12 }}
-          image: "{{ .Values.image.repository }}:{{ .Chart.AppVersion }}"
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           env:
             - name: PERIOD
