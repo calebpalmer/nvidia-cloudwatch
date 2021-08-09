@@ -26,7 +26,7 @@ Clone this repository and install the chart:
 
 #### With Cloudwatch exporting
 
-	microk8s.helm3 upgrade --install nvidia-cloudwatch helm/nvidia-cloudwatch -f - <<EOF
+	helm upgrade --install nvidia-cloudwatch helm/nvidia-cloudwatch -f - <<EOF
 	cloudwatch:
 	  enabled: true
 	  region: us-east-1
