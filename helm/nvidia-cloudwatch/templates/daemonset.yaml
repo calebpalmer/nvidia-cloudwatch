@@ -29,22 +29,27 @@ spec:
             {{- toYaml .Values.securityContext | nindent 12 }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          {{- if .Values.cloudwatch.enabled }}
+          args: ["./nvidia-cloudwatch", "-cloudwatch"]
+          {{- end }}
           env:
+            {{- if .Values.cloudwatch.enabled }}
             - name: PERIOD
               value: {{ .Values.period | quote }}
             - name: RESOLUTION
               value: {{ .Values.resolution | quote }}
-            {{- if .Values.aws.region }}
+            {{- if .Values.cloudwatch.region }}
             - name: AWS_REGION
-              value: {{ .Values.aws.region }}
+              value: {{ .Values.cloudwatch.region }}
             {{- end }}
-            {{- if .Values.aws.accessKeyId }}
+            {{- if .Values.cloudwatch.accessKeyId }}
             - name: AWS_ACCESS_KEY_ID
               value: {{ .Values.aws.accessKeyId }}
             {{- end }}
-            {{- if .Values.aws.secretAccessKey }}
+            {{- if .Values.cloudwatch.secretAccessKey }}
             - name: AWS_SECRET_ACCESS_KEY
               value: {{ .Values.aws.secretAccessKey }}
+            {{- end }}
             {{- end }}
           resources:
             {{- toYaml .Values.resources | nindent 12 }}

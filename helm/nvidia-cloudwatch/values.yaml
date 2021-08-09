@@ -1,11 +1,12 @@
 # Default values for nvidia-cloudwatch.
 
-aws: {}
-# region: us-east-1
-# accessKeyId: xxxx
-# secretAccessKey: xxxx
-period: 60
-resolution: 60
+cloudwatch:
+  enabled: false
+  # region: us-east-1
+  # accessKeyId: xxxx
+  # secretAccessKey: xxxx
+  period: 60
+  resolution: 60
 
 image:
   repository: calebpalmer/nvidia-cloudwatch
