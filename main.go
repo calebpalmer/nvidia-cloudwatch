@@ -64,7 +64,10 @@ func main() {
 	nvidia.Init()
 	defer nvidia.Shutdown()
 
-	startCloudwatchExporter := flag.Bool("--cloudwatch-exporter", false, "Enable cloudwatch exporter")
+	// setup command line arguments
+	startCloudwatchExporter := flag.Bool("cloudwatch", false, "Enable cloudwatch exporter")
+	flag.Parse()
+
 	if *startCloudwatchExporter {
 		fmt.Println("Starting cloudwatch exporter.")
 		go cloudwatch.StartExporter()
